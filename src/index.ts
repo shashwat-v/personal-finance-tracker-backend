@@ -1,32 +1,22 @@
 import express from "express";
-import mongoose from "mongoose";
 import bodyParser from "body-parser";
-require("dotenv").config();
+import connectDB from "./db/connectDB";
+import dotenv from "dotenv";
+dotenv.config({ path: "./.env" });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const USER = process.env.DB_USER;
-const PASSWORD = process.env.DB_PASSWORD;
 
 app.use(bodyParser.json());
 
-// Mongoose Declaration
-const dbURI = `mongodb+srv://${USER}:${PASSWORD}@cluster0.4q1atv1.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-
-mongoose
-  .connect(dbURI)
+// database
+connectDB()
   .then(() => {
-    console.log("MongoDB Connected...");
+    app.listen(process.env.PORT || 8000, () => {
+      //process.env.PORT ||
+      console.log(`⚙️ Server is running at port : ${process.env.PORT}`);
+    });
   })
   .catch((err) => {
-    console.error(err);
+    console.log("MONGO db connection failed !!! ", err);
   });
-
-// Express root code
-app.get("/", (req, res) => {
-  res.send("Hello Finance Tracker");
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
