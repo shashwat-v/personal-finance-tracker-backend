@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { DB_NAME } from "../constants";
 
 const dbURI =
   process.env.MONGO_DB_URI ||
@@ -6,6 +7,9 @@ const dbURI =
 
 const connetDB = async () => {
   try {
+    const DB_OPTIONS = {
+      dbName: DB_NAME,
+    };
     const connectionInstance = await mongoose.connect(dbURI);
     console.log(
       `\n MongoDb connected!! DB:Host${connectionInstance.connection.host}`
