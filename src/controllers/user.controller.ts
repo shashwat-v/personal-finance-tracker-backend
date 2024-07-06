@@ -125,11 +125,7 @@ class UserController {
         return res
           .status(200)
           .json(
-            new ApiResponse(
-              200,
-              existedUser.token,
-              "User logged in successfully"
-            )
+            new ApiResponse(200, existedUser, "User logged in successfully")
           );
       } else {
         // Passwords do not match
