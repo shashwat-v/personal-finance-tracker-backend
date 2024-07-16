@@ -112,7 +112,7 @@ class UserController {
       const isMatch = await bcrypt.compare(password, existedUser.password);
 
       if (isMatch) {
-        //generate jwt
+        // Generate jwt
         const token = jwt.sign(
           { userID: existedUser._id },
           process.env.JWT_SECRET_KEY ||
@@ -122,10 +122,19 @@ class UserController {
         existedUser.token = token;
         // User is authenticated successfully
         console.log("User logged in successfully:", email);
+
+        // Send response with the user's unique ID and other details
+        const responseData = {
+          _id: existedUser._id,
+          email: existedUser.email,
+          token: existedUser.token,
+          // include other fields as necessary
+        };
+
         return res
           .status(200)
           .json(
-            new ApiResponse(200, existedUser, "User logged in successfully")
+            new ApiResponse(200, responseData, "User logged in successfully")
           );
       } else {
         // Passwords do not match
