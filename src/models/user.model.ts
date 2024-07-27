@@ -1,6 +1,15 @@
-import mongoose from "mongoose";
+import mongoose, { Document, Schema, model } from "mongoose";
 
-const userSchema = new mongoose.Schema(
+export interface IUser extends Document {
+  fullname: string;
+  email: string;
+  phoneNumber: string;
+  password: string; // Password is optional because it won't be present for Google OAuth users
+  token?: string;
+  googleId?: string; // Add googleId field for Google OAuth
+}
+
+const userSchema = new Schema<IUser>(
   {
     fullname: {
       type: String,
@@ -21,15 +30,18 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "passsword is required"],
-      unique: true,
       trim: true,
     },
     token: {
       type: String,
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow this field to be optional and unique
+    },
   },
   { timestamps: true }
 );
 
-export const userModel = mongoose.model("User", userSchema);
+export const userModel = model<IUser>("User", userSchema);
