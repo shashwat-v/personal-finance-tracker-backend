@@ -10,12 +10,14 @@ import {
   generateAuthCode,
   setAccessToken,
 } from "../controllers/fyers.controller";
+import { googleAuth } from "../controllers/googelauth.controller";
 const router = express.Router();
 
 //Public Routes
 router.post("/register", UserController.userRegistration);
 router.post("/login", UserController.userLogin);
 //google auth
+router.post("/google", googleAuth);
 
 //plaid routes
 router.post("/create_link_token", createLinkToken);
