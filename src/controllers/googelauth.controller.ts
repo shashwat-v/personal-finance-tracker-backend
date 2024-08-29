@@ -10,7 +10,6 @@ export const googleAuth = async (
   res: Response
 ): Promise<void> => {
   const { token } = req.body;
-
   try {
     // Verify the ID token
     const ticket = await client.verifyIdToken({
@@ -47,6 +46,12 @@ export const googleAuth = async (
       res.status(404).json({ message: "User not found. Please sign up." });
     } else {
       // User found, respond with user data
+      const responseData = {
+        _id: user._id,
+        fullname: user.fullname,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+      };
       res.json({ user, message: "User authenticated successfully" });
     }
   } catch (error) {

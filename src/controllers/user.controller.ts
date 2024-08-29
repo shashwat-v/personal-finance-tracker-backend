@@ -10,6 +10,7 @@ import bcrypt from "bcryptjs";
 import ApiError from "../utils/apiError";
 import ApiResponse from "../utils/apiResponse";
 import jwt from "jsonwebtoken";
+import { CookieOptions } from "express";
 
 class UserController {
   static userRegistration = async (
@@ -18,15 +19,10 @@ class UserController {
   ): Promise<Response> => {
     const { fullname, email, password, phoneNumber } = req.body;
 
-    // Log the input for debugging purposes
-    // console.log("Received input:", { fullname, email, password, phoneNumber });
+    if (!fullname || !email || !password || !phoneNumber) {
+      throw new ApiError(400, "Please fill all the fields");
+    }
 
-    // Validate that all required fields are provided
-    // if (!fullname || !email || !password || !phoneNumber) {
-    //   throw new ApiError(400, "Please fill all the fields");
-    // }
-
-    // Check if the user already exists
     const existedUser = await userModel.findOne({
       $or: [{ email }, { phoneNumber }],
     });
@@ -35,43 +31,48 @@ class UserController {
       throw new ApiError(409, "User with email or phone number already exists");
     }
 
-    // Check if all required fields are provided
-    // if (!fullname || !email || !password || !phoneNumber) {
-    //   throw new ApiError(400, "Please fill all the fields");
-    // }
-
     try {
-      // Hash the password
-      if (!password) {
-        console.error("Password is undefined");
-        throw new ApiError(400, "Password is required");
-      }
       const salt = await bcrypt.genSalt(10);
       const hashedPassword = await bcrypt.hash(password, salt);
 
-      // Create the new user
       const newUser = new userModel({
         fullname,
         email,
         phoneNumber,
-        password: hashedPassword, // Save the hashed password
+        password: hashedPassword,
       });
 
-      // Save the user to the database
       await newUser.save();
-      //generate jwt
+
       const token = jwt.sign(
         { userID: newUser._id },
         process.env.JWT_SECRET_KEY ||
           "pOpXsyY9GHlN8j92fHPy9rH9+IHN+71mUu2U99P5WfT",
         { expiresIn: "5d" }
       );
-      newUser.token = token;
-      await newUser.save();
-      // Return success response
+
+      // Set token in HttpOnly cookie
+      const cookieOptions: CookieOptions = {
+        httpOnly: true, // Mitigates XSS attacks
+        secure: process.env.NODE_ENV === "production", // Only send cookie over HTTPS in production
+        sameSite: "strict", // Protects against CSRF attacks
+        maxAge: 5 * 24 * 60 * 60 * 1000, // 5 days
+      };
+      res.cookie("token", token, cookieOptions);
+
+      // Return success response with only the required user details
+      const responseData = {
+        _id: newUser._id,
+        fullname: newUser.fullname,
+        email: newUser.email,
+        phoneNumber: newUser.phoneNumber,
+      };
+
       return res
         .status(201)
-        .json(new ApiResponse(201, newUser, "User registered successfully"));
+        .json(
+          new ApiResponse(201, responseData, "User registered successfully")
+        );
     } catch (error) {
       console.error(error);
       throw new ApiError(
@@ -80,18 +81,13 @@ class UserController {
       );
     }
   };
+
   static userLogin = async (
     req: TypedRequestBody<LoginBody>,
     res: TypedResponse<ApiResponse<any>>
   ): Promise<Response> => {
     const { email, password } = req.body;
-
-    // Log the received input for debugging
-    console.log("Login request body:", { email, password });
-
-    // Check if both email and password are provided
     if (!email || !password) {
-      // Log missing fields and return error response
       console.error("Missing email or password in login request");
       return res
         .status(400)
@@ -99,36 +95,38 @@ class UserController {
     }
 
     try {
-      // Find the user by email
       const existedUser = await userModel.findOne({ email });
-
-      // If user is not found
       if (!existedUser) {
         console.error("User not found for email:", email);
         throw new ApiError(404, "User not found");
       }
 
-      // Compare the provided password with the stored hashed password
       const isMatch = await bcrypt.compare(password, existedUser.password);
 
       if (isMatch) {
-        // Generate jwt
+        // Generate JWT
         const token = jwt.sign(
           { userID: existedUser._id },
           process.env.JWT_SECRET_KEY ||
             "pOpXsyY9GHlN8j92fHPy9rH9+IHN+71mUu2U99P5WfT",
           { expiresIn: "5d" }
         );
-        existedUser.token = token;
-        // User is authenticated successfully
-        console.log("User logged in successfully:", email);
 
-        // Send response with the user's unique ID and other details
+        // Set token in HttpOnly cookie
+        const cookieOptions: CookieOptions = {
+          httpOnly: true, // Mitigates XSS attacks
+          secure: process.env.NODE_ENV === "production", // Only send cookie over HTTPS in production
+          // sameSite: "strict", // Protects against CSRF attacks
+          maxAge: 5 * 24 * 60 * 60 * 1000, // 5 days
+        };
+        res.cookie("token", token, cookieOptions);
+
+        // Return success response with only the required user details
         const responseData = {
           _id: existedUser._id,
+          fullname: existedUser.fullname,
           email: existedUser.email,
-          token: existedUser.token,
-          // include other fields as necessary
+          phoneNumber: existedUser.phoneNumber,
         };
 
         return res
@@ -137,17 +135,26 @@ class UserController {
             new ApiResponse(200, responseData, "User logged in successfully")
           );
       } else {
-        // Passwords do not match
         console.error("Incorrect password for user:", email);
-        throw new ApiError(401, "Invalid email or password");
+        return res
+          .status(401)
+          .json(new ApiResponse(401, null, "Invalid email or password"));
       }
     } catch (error) {
-      // Log the error and respond with a 500 status code
       console.error("Error during login:", error);
       return res
         .status(500)
         .json(new ApiResponse(500, null, "An error occurred during login"));
     }
   };
+
+  static logout = (req: Request, res: Response): Response => {
+    // Clear the token cookie
+    res.clearCookie("token");
+    return res
+      .status(200)
+      .json(new ApiResponse(200, null, "User logged out successfully"));
+  };
 }
+
 export default UserController;

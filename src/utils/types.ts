@@ -1,5 +1,4 @@
 // src/utils/types.ts
-
 import { Request, Response } from "express";
 
 // Define a custom request type with a body of type T

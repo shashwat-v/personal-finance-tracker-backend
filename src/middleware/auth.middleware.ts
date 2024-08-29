@@ -1,65 +1,53 @@
-import jwt from "jsonwebtoken";
-import { userModel } from "../models/user.model";
 import { Request, Response, NextFunction } from "express";
-import { TypedRequestBody, TypedResponse } from "../utils/types";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import { userModel } from "../models/user.model";
 
-interface VerifyUser {
-  token: string;
+interface IUser {
+  fullname: string;
+  email: string;
+  phoneNumber: string;
 }
 
-interface ApiResponse<T> {
-  status: string;
-  message: string;
-  data?: T;
+interface AuthenticatedRequest extends Request {
+  user?: IUser | null;
 }
 
-interface DecodedToken {
-  userID: string;
-}
-
-declare module "express-serve-static-core" {
-  interface Request {
-    user?: any;
-  }
-}
-
-const checkUserAuth = async (
-  req: TypedRequestBody<VerifyUser>,
-  res: TypedResponse<ApiResponse<any>>,
+const protectRoute = async (
+  req: AuthenticatedRequest,
+  res: Response,
   next: NextFunction
-): Promise<Response | void> => {
-  let token;
-  const { authorization } = req.headers;
+) => {
+  try {
+    const token = req.cookies.token;
 
-  if (authorization && authorization.startsWith("Bearer")) {
-    try {
-      // Get Token from header
-      token = authorization.split(" ")[1];
-
-      // Verify Token
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET_KEY ||
-          "pOpXsyY9GHlN8j92fHPy9rH9+IHN+71mUu2U99P5WfT"
-      ) as DecodedToken;
-
-      // Get User from Token
-      req.user = await userModel.findById(decoded.userID).select("-password");
-
-      next();
-    } catch (error) {
-      console.log(error);
+    if (!token) {
       return res
         .status(401)
-        .send({ status: "failed", message: "Unauthorized User" });
+        .json({ error: "Unauthorized - No Token Provided" });
     }
-  }
 
-  if (!token) {
-    return res
-      .status(401)
-      .send({ status: "failed", message: "Unauthorized User, No Token" });
+    const secretKey = process.env.JWT_SECRET_KEY;
+
+    if (!secretKey) {
+      throw new Error("JWT secret key is not defined in environment variables");
+    }
+    const decoded = jwt.verify(token, secretKey) as JwtPayload;
+    // console.log(decoded);
+    if (!decoded || typeof decoded === "string") {
+      return res.status(401).json({ error: "Unauthorized - Invalid Token" });
+    }
+
+    const user = await userModel.findById(decoded.userID).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    req.user = user;
+    next();
+  } catch (error: any) {
+    console.log("Error in protectRoute middleware: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
-export default checkUserAuth;
+export default protectRoute;
